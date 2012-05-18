@@ -1,4 +1,4 @@
-hoodoo
-======
+t
+=
 
-todo list manager
+streamlined todo list manager
