@@ -98,20 +98,17 @@ readTodoFile = do
 todoColor :: Day -> Todo -> String
 todoColor today todo =
     case () of _
-                 | daysSince > period -> red
-                 | daysSince >= (x * 3) -> orange
-                 | daysSince >= (x * 2) -> yellow
-                 | daysSince >= x -> green
-                 | otherwise -> blue
+                 | daysSince <= 7 -> blue
+                 | daysSince <= 21 -> green
+                 | otherwise -> red
     where daysSince = diffDays today $ todoDate todo
-          period = if todoActive todo then 7 else 28
-          x = (period + 1) `div` 4
 
+underlinedRed = "\27[4;1;31m"
 red = "\27[1;31m"
-orange = "\27[0;33m"
-yellow = "\27[1;33m"
-green = "\27[1;32m"
-blue = "\27[1;36m"
+--orange = "\27[0;33m"
+--yellow = "\27[0;1;33m"
+green = "\27[0;1;32m"
+blue = "\27[0;1;36m"
 normalColor = "\27[0m"
 
 -- printList, fileUpdateBool, printAllBool
@@ -265,9 +262,9 @@ todoFile = do
 
 todoToOutputStr :: Int -> Day -> Bool -> Todo -> String
 todoToOutputStr index today doAll t =
-    (if todoRepeat t > 0 then red else todoColor') ++
-    (if todoActive t then "* " else "  ") ++
-    todoColor' ++
+    (if todoRepeat t > 0 then underlinedRed else todoColor') ++
+    (if todoActive t then "*" else " ") ++
+    todoColor' ++ " " ++
     (show index) ++ " " ++
     (if doAll then todoToFileStr t else todoDescription t) ++
     normalColor
