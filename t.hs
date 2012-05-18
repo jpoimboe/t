@@ -25,7 +25,7 @@ data Todo = Todo {
     todoTags :: [String],
     todoRepeat :: Integer,
     todoActive :: Bool
-} deriving Show
+} deriving Eq
 
 type TodoList = [Todo]
 type Tag = String
@@ -118,10 +118,13 @@ data OutInfo = OutInfo {
     outFile :: Bool,
     outAll :: Bool
 }
-    
-mapFalse = map (const False)
-mapTrue = map (const True)
 
+
+insert :: Todo -> TodoList -> TodoList
+insert newTodo = fst . foldr f ([],False)
+    where f oldTodo (newList, inserted) = if inserted == False && (todoDate newTodo >= todoDate oldTodo)
+                                            then (oldTodo:newTodo:newList, True)
+                                            else (oldTodo:newList, inserted)
 --TODO: maybe use a Writer monad or similar to store the stdout output
 --TODO: insert sorted?
 --TODO: use that compiler flag that allows alternate syntax to _ _ _
@@ -135,9 +138,9 @@ add args today tag todos = return (newTodoList, outInfo)
                            todoRepeat = 0,
                            todoActive = False
                          }
-          newTodoList = todos ++ [newTodo]
+          newTodoList = insert newTodo todos
           outInfo = OutInfo {
-              outList = mapFalse todos ++ [True],
+              outList = map (== newTodo) newTodoList,
               outFile = True,
               outAll = False
           }
@@ -168,7 +171,7 @@ touch args today tag todos
     where arg = read (head args) - 1
           (xs,todo:ys) = splitAt arg todos
           newTodo = todo { todoDate = today, todoActive = True }
-          newTodoList = xs ++ ys ++ [newTodo]
+          newTodoList = insert newTodo $ xs ++ ys
           outInfo = OutInfo {
               outList = mapRelevant today tag newTodoList,
               outFile = True,
@@ -186,7 +189,7 @@ mv args todos
           newTodoList = xs ++ newTodo:ys
           newTodo = todo { todoDescription = intercalate " " $ tail args }
           outInfo = OutInfo {
-              outList = mapFalse xs ++ True:(mapFalse ys),
+              outList = map (== newTodo) newTodoList,
               outFile = True,
               outAll = False
           }
@@ -204,7 +207,7 @@ changeTags args todos
           newTodo = todo { todoTags = newTags }
           newTodoList = xs ++ newTodo:ys
           outInfo = OutInfo {
-              outList = mapFalse xs ++ True:(mapFalse ys),
+              outList = map (== newTodo) newTodoList,
               outFile = True,
               outAll = True
           }
@@ -222,7 +225,7 @@ changeRepeat  args todos
           newTodo = todo { todoRepeat = newRepeat }
           newTodoList = xs ++ newTodo:ys
           outInfo = OutInfo {
-              outList = mapFalse xs ++ True:(mapFalse ys),
+              outList = map (== newTodo) newTodoList,
               outFile = True,
               outAll = True
           }
@@ -241,9 +244,9 @@ listAll args todos
     | index > length todos = throwError "bad line #"
     | otherwise = return (todos, outInfo)
     where index = if null args then 0 else read (head args) - 1
-          (xs,_:ys) = splitAt index todos
+          (_,t:_) = splitAt index todos
           outInfo = OutInfo {
-            outList = if null args then mapTrue todos else mapFalse xs ++ True:(mapFalse ys),
+            outList = if null args then map (const True) todos else map (== t) todos,
             outFile = False,
             outAll = True
             }
