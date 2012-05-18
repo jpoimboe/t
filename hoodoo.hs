@@ -7,7 +7,7 @@ import Data.Time
 import System.Directory (copyFile)
 import System.Environment (getEnv, getArgs)
 import System.IO.Error (isDoesNotExistError)
-import System.Random (randomIO)
+import System.Random (getStdGen, randoms)
 import Text.Parsec hiding (spaces,newline)
 import Text.Parsec.String (Parser, parseFromFile)
 
@@ -85,8 +85,9 @@ newline = () <$ char '\n'
 
 readTodoFile :: IO (TodoError TodoList)
 readTodoFile = do
-    random <- randomIO :: IO Integer
-    let tmpFile = "/tmp/todo" ++ show (random `mod` 1000) ++ ".txt"
+    gen <- getStdGen
+    let randomStr = map (['A'..'Z'] !!) $ map (`mod` 26) $ take 5 (randoms gen :: [Int])
+    let tmpFile = "/tmp/todo-backup." ++ randomStr
     todoFile' <- todoFile
     copyFile todoFile' tmpFile
     p <- parseFromFile parseLines tmpFile
