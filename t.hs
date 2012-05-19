@@ -15,7 +15,8 @@ data TodoAtom = Description String |
                 Date Day |
                 Tags [String] |
                 Repeat Integer |
-                Active Bool
+                Active Bool |
+                Mark Bool
                 deriving Show
 
 
@@ -24,7 +25,8 @@ data Todo = Todo {
     todoDate :: Day,
     todoTags :: [String],
     todoRepeat :: Integer,
-    todoActive :: Bool
+    todoActive :: Bool,
+    todoMark :: Bool
 } deriving Eq
 
 type TodoList = [Todo]
@@ -55,9 +57,11 @@ parseRepeat = Repeat <$> read <$> (string "repeat=" *> many1 digit)
 parseActive :: Parser TodoAtom
 parseActive = Active <$> (== '1') <$> (string "active=" *> digit)
 
+parseMark :: Parser TodoAtom
+parseMark = Mark <$> (== '1') <$> (string "mark=" *> digit)
 
 parseTodo :: Parser Todo
-parseTodo = atomListToTodo <$> ((:) <$> (parseDescription <* spaces) <*> (sepBy (choice [parseDate,parseTags,parseRepeat,parseActive]) spaces <* (newline <|> eof)))
+parseTodo = atomListToTodo <$> ((:) <$> (parseDescription <* spaces) <*> (sepBy (choice [parseDate,parseTags,parseRepeat,parseActive,parseMark]) spaces <* (newline <|> eof)))
 
 atomListToTodo :: [TodoAtom] -> Todo
 atomListToTodo xs = Todo {
@@ -65,13 +69,15 @@ atomListToTodo xs = Todo {
                         todoDate = head date,
                         todoTags = head tags,
                         todoRepeat = if null repeat then 0 else head repeat,
-                        todoActive = if null active then False else head active
+                        todoActive = if null active then False else head active,
+                        todoMark = if null mark then False else head mark
                     }
     where desc = [x | Description x <- xs]
           date = [x | Date x <- xs]
           tags = [x | Tags x <- xs] 
           repeat = [x | Repeat x <- xs]
           active = [x | Active x <- xs]
+          mark = [x | Mark x <- xs]
 
 
 parseLines :: Parser TodoList
@@ -104,7 +110,7 @@ todoColor today todo =
     where daysSince = diffDays today $ todoDate todo
 
 underlinedRed = "\27[4;1;31m"
-red = "\27[1;31m"
+red = "\27[0;1;31m"
 --orange = "\27[0;33m"
 --yellow = "\27[0;1;33m"
 green = "\27[0;1;32m"
@@ -136,7 +142,8 @@ add args today tag todos = return (newTodoList, outInfo)
                            todoDate = today,
                            todoTags = [tag],
                            todoRepeat = 0,
-                           todoActive = False
+                           todoActive = False,
+                           todoMark = False
                          }
           newTodoList = insert newTodo todos
           outInfo = OutInfo {
@@ -170,7 +177,7 @@ touch args today tag todos
     | otherwise = return (newTodoList, outInfo)
     where arg = read (head args) - 1
           (xs,todo:ys) = splitAt arg todos
-          newTodo = todo { todoDate = today, todoActive = True }
+          newTodo = todo { todoDate = today, todoActive = True, todoMark = False }
           newTodoList = insert newTodo $ xs ++ ys
           outInfo = OutInfo {
               outList = mapRelevant today tag newTodoList,
@@ -216,7 +223,7 @@ changeRepeat :: [String] -> TodoList -> TodoError (TodoList, OutInfo)
 changeRepeat [] _ = throwError "missing line #"
 changeRepeat [_] _ = throwError "missing repeat value"
 changeRepeat (_:_:_:_) _ = throwError "too many args"
-changeRepeat  args todos
+changeRepeat args todos
     | index >= length todos = throwError "bad line #"
     | otherwise = return (newTodoList, outInfo)
     where index = read (head args) - 1
@@ -228,6 +235,21 @@ changeRepeat  args todos
               outList = map (== newTodo) newTodoList,
               outFile = True,
               outAll = True
+          }
+ 
+--TODO: DRY it up, lots of repeating in these functions
+mark :: [String] -> TodoList -> TodoError (TodoList, OutInfo)
+mark args todos
+    | null args = return (todos, outInfo)
+    | any (>= length todos) indexes = throwError "bad line #"
+    | otherwise = return (newTodoList, outInfo)
+    where indexes = map (pred . read) args
+          newTodoList = zipWith f [0..] todos
+          f index todo = if index `elem` indexes then todo { todoMark = True } else todo
+          outInfo = OutInfo {
+              outList = map todoMark newTodoList,
+              outFile = not $ null args,
+              outAll = False
           }
 
 listRelevant :: Day -> Tag -> TodoList -> TodoError (TodoList, OutInfo)
@@ -266,7 +288,7 @@ todoFile = do
 todoToOutputStr :: Int -> Day -> Bool -> Todo -> String
 todoToOutputStr index today doAll t =
     (if todoRepeat t > 0 then underlinedRed else todoColor') ++
-    (if todoActive t then "*" else " ") ++
+    (if todoMark t then "*" else " ") ++
     todoColor' ++ " " ++
     (show index) ++ " " ++
     (if doAll then todoToFileStr t else todoDescription t) ++
@@ -279,7 +301,8 @@ todoToFileStr t =
     " | date=" ++ (showGregorian $ todoDate t) ++
     " tag=" ++ (intercalate "," $ todoTags t) ++
     (if todoRepeat t > 0 then " repeat=" ++ show (todoRepeat t) else "") ++
-    (if todoActive t then " active=1" else "")
+    (if todoActive t then " active=1" else "") ++
+    (if todoMark t then " mark=1" else "")
 
 
 outputTodos :: Day -> (TodoList, OutInfo) -> IO ()
@@ -303,6 +326,7 @@ processArgs args today tag =
         ("mv":argsTail) -> mv argsTail
         ("tag":argsTail) -> changeTags argsTail
         ("repeat":argsTail) -> changeRepeat argsTail
+        ("mark":argsTail) -> mark argsTail
         _ -> const $ throwError "bad command"
 
 main = do
