@@ -161,7 +161,7 @@ rm args today tag todos
     where arg = read (head args) - 1
           (xs,todo:ys) = splitAt arg todos
           newTodoList = xs ++ ys ++ if todoRepeat todo == 0 then [] else [newTodo]
-          newTodo = todo { todoDate = newDay }
+          newTodo = todo { todoDate = newDay, todoMark = False }
           newDay = addDays (todoRepeat todo) today
           outInfo = OutInfo {
               outList = mapRelevant today tag newTodoList,
