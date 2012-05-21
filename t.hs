@@ -238,16 +238,18 @@ changeRepeat args todos
           }
  
 --TODO: DRY it up, lots of repeating in these functions
-mark :: [String] -> TodoList -> TodoError (TodoList, OutInfo)
-mark args todos
+mark :: [String] -> Tag -> TodoList -> TodoError (TodoList, OutInfo)
+mark args tag todos
     | null args = return (todos, outInfo)
     | any (>= length todos) indexes = throwError "bad line #"
     | otherwise = return (newTodoList, outInfo)
     where indexes = map (pred . read) args
           newTodoList = zipWith f [0..] todos
-          f index todo = if index `elem` indexes then todo { todoMark = True } else todo
+          f index todo = if index `elem` indexes
+                            then todo { todoMark = not $ todoMark todo }
+                            else todo
           outInfo = OutInfo {
-              outList = map todoMark newTodoList,
+              outList = map (\x -> todoMark x && tag `elem` todoTags x) newTodoList,
               outFile = not $ null args,
               outAll = False
           }
@@ -326,7 +328,7 @@ processArgs args today tag =
         ("mv":argsTail) -> mv argsTail
         ("tag":argsTail) -> changeTags argsTail
         ("repeat":argsTail) -> changeRepeat argsTail
-        ("mark":argsTail) -> mark argsTail
+        ("mark":argsTail) -> mark argsTail tag
         _ -> const $ throwError "bad command"
 
 main = do
